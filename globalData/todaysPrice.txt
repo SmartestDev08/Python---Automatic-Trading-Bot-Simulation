@@ -1,0 +1,5 @@
+16-12-2023
+price 132.68
+change_point 0.08
+change_percentage 0.06
+total_vol 50.85M

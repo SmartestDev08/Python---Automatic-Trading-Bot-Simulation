@@ -8,8 +8,8 @@ import datetime
 # https://www.nasdaq.com/market-activity/stocks/googl
 # This bot only grabs data once per day, whenever the file is executed
 
-def get_todays_info():
-    def fetch_todays_info():
+def get_todays_data():
+    def fetch_todays_data():
         load_dotenv()
 
         url = "https://realstonks.p.rapidapi.com/GOOGL"
@@ -28,18 +28,18 @@ def get_todays_info():
         date = datetime.datetime.now()
         date = date.strftime("%d-%m-%Y")
         
-        content = open("data/todaysPrice.txt", "r").read()
+        content = open("globalData/todaysPrice.txt", "r").read()
 
         return date in content
     
-    def get_todays_fetched_info():
+    def get_todays_fetched_data():
         data = {}
         
         #date = datetime.datetime.now()
         #date = date.strftime("%d-%m-%Y")
         #data["date"] = date
 
-        with open("data/todaysPrice.txt", "r") as f:
+        with open("globalData/todaysPrice.txt", "r") as f:
             for i, line in enumerate(f.readlines()):
                 line = line.replace("\n", "")
 
@@ -57,41 +57,63 @@ def get_todays_info():
         
         return data
 
-    def record_last_days_info():
-        info = get_todays_fetched_info()
-        with open("data/pricesRecord.txt", "a") as f:
-            for label in info:
+    def record_last_days_data():
+        data = get_todays_fetched_data()
+        with open("globalData/pricesRecord.txt", "a") as f:
+            for label in data:
                 if label != "date":
-                    f.write(f"{label} {info[label]}\n")
+                    f.write(f"{label} {data[label]}\n")
                 else:
-                    f.write(f"{info[label]}\n")
+                    f.write(f"{data[label]}\n")
             
             f.close()
         
         return
     
-    def write_todays_new_info(info):
+    def write_todays_new_data(data):
         date = datetime.datetime.now()
         date = date.strftime("%d-%m-%Y")
 
-        with open("data/todaysPrice.txt", "w") as f:
+        with open("globalData/todaysPrice.txt", "w") as f:
             f.write(f"{date}\n")
-            for label in info:
-                f.write(f"{label} {info[label]}\n")
+            for label in data:
+                f.write(f"{label} {data[label]}\n")
             f.close()
         
         return
 
     if has_been_fetched_already():
-        info = get_todays_fetched_info()
-        return info
+        data = get_todays_fetched_data()
+        return data
     else:
-        record_last_days_info()
-        info = fetch_todays_info()
-        write_todays_new_info(info)
-        return info
+        record_last_days_data()
+        data = fetch_todays_data()
+        write_todays_new_data(data)
+        return data
 
-def save_transaction(action, lost, won, new_data):
+def get_previous_days_data():
+    data = []
+    with open("globalData/pricesRecord.txt", "r") as f:
+        current_day = {}
+        for i, line in enumerate(f.readlines()):
+            line = line.replace("\n", "")
+            if len(line) > 2:
+                if line.count("-") == 2 and i != 0:
+                    data.append(current_day)
+                    current_day = {}
+                elif i != 0:
+                    label, value = line.split(" ")
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass
+
+                    current_day[label] = value
+        data.append(current_day)
+    
+    return data
+
+def save_transaction(botName, action, lost, won, new_data):
     date = datetime.datetime.now()
     date = date.strftime("%d-%m-%Y")
     data = {
@@ -101,7 +123,7 @@ def save_transaction(action, lost, won, new_data):
         "NewData": new_data
     }
 
-    with open("data/transactions.txt", "a") as f:
+    with open(f"individualData/{botName}/transactions.txt", "a") as f:
         f.write(f"{date}\n")
         for label in data:
             value = data[label]
@@ -111,12 +133,12 @@ def save_transaction(action, lost, won, new_data):
     
     return True
 
-def buy(money_spent):
-    info = get_todays_info()
-    stock_price = info["price"]
+def buy(botName, money_spent):
+    data = get_todays_data()
+    stock_price = data["price"]
 
     current_data = {}
-    with open("data/status.txt", "r") as f:
+    with open(f"individualData/{botName}/status.txt", "r") as f:
         for line in f.readlines():
             line = line.replace("\n", "")
 
@@ -135,21 +157,21 @@ def buy(money_spent):
         "Stocks": current_data["Stocks"] + stocks_bought
     }
 
-    with open("data/status.txt", "w") as f:
+    with open(f"individualData/{botName}/status.txt", "w") as f:
         for label in new_data:
             value = new_data[label]
 
             f.write(f"{label} {value}\n")
     
-    save_transaction("buy", money_spent, stocks_bought, new_data)
+    save_transaction(botName, "buy", money_spent, stocks_bought, new_data)
     return True
 
-def sell(stocks_sold):
-    info = get_todays_info()
-    stock_price = info["price"]
+def sell(botName, stocks_sold):
+    data = get_todays_data()
+    stock_price = data["price"]
 
     current_data = {}
-    with open("data/status.txt", "r") as f:
+    with open(f"individualData/{botName}/status.txt", "r") as f:
         for line in f.readlines():
             line = line.replace("\n", "")
 
@@ -168,17 +190,70 @@ def sell(stocks_sold):
         "Stocks": current_data["Stocks"] - stocks_sold
     }
 
-    with open("data/status.txt", "w") as f:
+    with open(f"individualData/{botName}/status.txt", "w") as f:
         for label in new_data:
             value = new_data[label]
 
             f.write(f"{label} {value}\n")
     
-    save_transaction("sell", stocks_sold, money_gained, new_data)
+    save_transaction(botName, "sell", stocks_sold, money_gained, new_data)
     return True
 
-todays_info = get_todays_info()
-print(todays_info)
+def get_bot_data(botName):
+    data = {}
+    with open(f"individualData/{botName}/status.txt", "r") as f:
+        for line in f.readlines():
+            line = line.replace("\n", "")
 
-buy(100)
-sell(0.1)
+            label, value = line.split(" ")
+            value = float(value)
+
+            data[label] = value
+    
+    return data
+
+class BotActions():
+    def __init__(self, previous_days_data, todays_data):
+        self.previous_days_data = previous_days_data
+        self.todays_data = todays_data
+    
+    def Bot1(self):
+        bot_name = "Bot1"
+        previous_days_data = self.previous_days_data
+        todays_data = self.todays_data
+
+        bot_data = get_bot_data(bot_name)
+        avg_recent_price = 0
+        days_counted = 0
+
+        for i, day_data in enumerate(previous_days_data):
+            if i > 5:
+                break
+
+            days_counted += 1
+            avg_recent_price += day_data["price"]
+        
+        avg_recent_price /= days_counted
+        current_price = todays_data["price"]
+        transaction_done = "Nothing"
+        
+        if current_price < avg_recent_price:
+            money_spent = bot_data["Money"] / 4
+            if money_spent > 0:
+                transaction_done = f"Bought stocks with {money_spent} money"
+                buy(bot_name, money_spent)
+        elif current_price > avg_recent_price:
+            stocks_sold = bot_data["Stocks"] / 4
+            if stocks_sold > 0:
+                transaction_done = f"Sold {stocks_sold} stocks"
+                sell(bot_name, stocks_sold)
+        
+        new_bot_data = get_bot_data(bot_name)
+        return [transaction_done, new_bot_data]
+
+todays_data = get_todays_data()
+previous_days_data = get_previous_days_data()
+
+actions = BotActions(previous_days_data, todays_data)
+result = actions.Bot1()
+print(result)

@@ -1,2 +1,0 @@
-Money 100
-Stocks 0
