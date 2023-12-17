@@ -217,43 +217,115 @@ class BotActions():
         self.previous_days_data = previous_days_data
         self.todays_data = todays_data
     
-    def Bot1(self):
+    def Bot1(self): # Super simple bot. It calculates the median price of the last 5 days. If price is below average, it buys 1/5, if above, it sells 1/5
+        date = datetime.datetime.now()
+        date = date.strftime("%d-%m-%Y")
         bot_name = "Bot1"
         previous_days_data = self.previous_days_data
         todays_data = self.todays_data
-
         bot_data = get_bot_data(bot_name)
-        avg_recent_price = 0
-        days_counted = 0
+        
+        last_transaction_date = None
+        with open(f"individualData/{bot_name}/transactions.txt", "r") as f:
+            for line in f.readlines():
+                line = line.replace("\n", "")
 
-        for i, day_data in enumerate(previous_days_data):
-            if i > 5:
-                break
+                if line.count("-") == 2:
+                    last_transaction_date = line
+        
+        if date != last_transaction_date:
+            avg_recent_price = 0
+            days_counted = 0
 
-            days_counted += 1
-            avg_recent_price += day_data["price"]
+            for i, day_data in enumerate(previous_days_data):
+                if i > 5:
+                    break
+
+                days_counted += 1
+                avg_recent_price += day_data["price"]
+            
+            avg_recent_price /= days_counted
+            current_price = todays_data["price"]
+            transaction_done = "Nothing"
+            
+            if current_price < avg_recent_price:
+                money_spent = bot_data["Money"] / 4
+                if money_spent > 0:
+                    transaction_done = f"Bought stocks with {money_spent} money"
+                    buy(bot_name, money_spent)
+            elif current_price > avg_recent_price:
+                stocks_sold = bot_data["Stocks"] / 4
+                if stocks_sold > 0:
+                    transaction_done = f"Sold {stocks_sold} stocks"
+                    sell(bot_name, stocks_sold)
+            
+            new_bot_data = get_bot_data(bot_name)
+            return [transaction_done, new_bot_data]
         
-        avg_recent_price /= days_counted
-        current_price = todays_data["price"]
-        transaction_done = "Nothing"
+        return ["Already did today's transaction", bot_data]
+
+    def Bot2(self): # Very simple bot. It calculated the median price of the last 10 days. The amount it will sell / buy will depend on how much it changes.
+        date = datetime.datetime.now()
+        date = date.strftime("%d-%m-%Y")
+        bot_name = "Bot2"
+        previous_days_data = self.previous_days_data
+        todays_data = self.todays_data
+        bot_data = get_bot_data(bot_name)
         
-        if current_price < avg_recent_price:
-            money_spent = bot_data["Money"] / 4
-            if money_spent > 0:
-                transaction_done = f"Bought stocks with {money_spent} money"
-                buy(bot_name, money_spent)
-        elif current_price > avg_recent_price:
-            stocks_sold = bot_data["Stocks"] / 4
-            if stocks_sold > 0:
-                transaction_done = f"Sold {stocks_sold} stocks"
-                sell(bot_name, stocks_sold)
+        last_transaction_date = None
+        with open(f"individualData/{bot_name}/transactions.txt", "r") as f:
+            for line in f.readlines():
+                line = line.replace("\n", "")
+
+                if line.count("-") == 2:
+                    last_transaction_date = line
         
-        new_bot_data = get_bot_data(bot_name)
-        return [transaction_done, new_bot_data]
+        if date != last_transaction_date:
+            avg_recent_price = 0
+            days_counted = 0
+
+            for i, day_data in enumerate(previous_days_data):
+                if i > 10:
+                    break
+
+                days_counted += 1
+                avg_recent_price += day_data["price"]
+            
+            avg_recent_price /= days_counted
+            current_price = todays_data["price"]
+            transaction_done = "Nothing"
+            
+            prices_difference = current_price - avg_recent_price
+
+            if prices_difference < 0:
+                prices_difference *= -1
+                money_fraction = max(prices_difference / avg_recent_price, 1)
+                money_spent = bot_data["Money"] * money_fraction
+                
+                if money_spent > 0:
+                    transaction_done = f"Bought stocks with {money_spent} money"
+                    buy(bot_name, money_spent)
+            elif prices_difference > 0:
+                stocks_fraction = max(prices_difference / avg_recent_price, 1)
+                stocks_sold = bot_data["Stocks"] * stocks_fraction
+                if stocks_sold > 0:
+                    transaction_done = f"Sold {stocks_sold} stocks"
+                    sell(bot_name, stocks_sold)
+            
+            new_bot_data = get_bot_data(bot_name)
+            return [transaction_done, new_bot_data]
+        
+        return ["Already did today's transaction", bot_data]
 
 todays_data = get_todays_data()
 previous_days_data = get_previous_days_data()
 
 actions = BotActions(previous_days_data, todays_data)
-result = actions.Bot1()
-print(result)
+result_bot1 = actions.Bot1()
+result_bot2 = actions.Bot2()
+
+print("Bot 1:")
+print(result_bot1)
+
+print("Bot 2:")
+print(result_bot2)

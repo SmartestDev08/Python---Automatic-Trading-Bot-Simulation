@@ -1,0 +1,2 @@
+Money 100.0
+Stocks 0.0
